@@ -174,7 +174,8 @@ defmodule Wallaby.Feature do
       def maybe_checkout_repos(async?) do
         otp_app()
         |> ecto_repos()
-        |> Enum.map(&checkout_ecto_repos(&1, async?))
+        |> Enum.map(&checkout_ecto_repos(&1, otp_app(), async?))
+        |> Enum.reject(&is_nil/1)
         |> metadata_for_ecto_repos()
       end
 
@@ -183,12 +184,14 @@ defmodule Wallaby.Feature do
       defp ecto_repos(nil), do: []
       defp ecto_repos(otp_app), do: Application.get_env(otp_app, :ecto_repos, [])
 
-      defp checkout_ecto_repos(repo, async) do
-        :ok = Ecto.Adapters.SQL.Sandbox.checkout(repo)
+      defp checkout_ecto_repos(repo, otp_app, async) do
+        if Application.get_env(otp_app, repo)[:pool] == Ecto.Adapters.SQL.Sandbox do
+          :ok = Ecto.Adapters.SQL.Sandbox.checkout(repo)
 
-        unless async, do: Ecto.Adapters.SQL.Sandbox.mode(repo, {:shared, self()})
+          unless async, do: Ecto.Adapters.SQL.Sandbox.mode(repo, {:shared, self()})
 
-        repo
+          repo
+        end
       end
 
       defp metadata_for_ecto_repos([]), do: Map.new()
